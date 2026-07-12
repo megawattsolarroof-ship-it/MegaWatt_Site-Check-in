@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ระบบเช็กอินหน้างาน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="js/api-config.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Prompt', sans-serif;
+      min-height: 100vh;
+      background: #f9fafb;
+      color: #1f2937;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+      position: relative;
+      overflow-x: hidden;
+      overscroll-behavior-y: none;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      animation: fadeInDown 0.6s ease;
+    }
+    .logo-icon {
+      font-size: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      text-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      line-height: 1;
+    }
+    h1 {
+      font-size: 1.6em;
+      font-weight: 700;
+      color: #0b3d1b;
+      margin-bottom: 6px;
+      letter-spacing: -0.5px;
+    }
+    .subtitle {
+      font-size: 0.9em;
+      color: #6b7280;
+      font-weight: 400;
+    }
+
+    /* Warning */
+    .api-warning {
+      display: none;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      color: #b45309;
+      border-radius: 12px;
+      padding: 12px 18px;
+      width: 100%;
+      max-width: 380px;
+      margin-bottom: 24px;
+      font-size: 0.9em;
+      font-weight: 500;
+      animation: fadeIn 0.5s ease;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+    }
+    .api-warning a { color: #d97706; font-weight: 700; text-decoration: underline; }
+
+    /* Menu Cards */
+    .menu-cards {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .btn-menu {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 22px;
+      text-decoration: none;
+      border-radius: 20px;
+      background: #ffffff;
+      border: 1px solid #f3f4f6;
+      color: #1f2937;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+      animation: fadeInUp 0.5s ease both;
+    }
+    .btn-menu:nth-child(1) { animation-delay: 0.1s; }
+    .btn-menu:nth-child(2) { animation-delay: 0.2s; }
+    .btn-menu:nth-child(3) { animation-delay: 0.3s; }
+    .btn-menu:nth-child(4) { animation-delay: 0.4s; }
+
+    .btn-menu:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px -5px rgba(11, 61, 27, 0.08);
+      border-color: #166534;
+    }
+
+    .card-icon {
+      width: 54px; height: 54px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      flex-shrink: 0;
+      background: #ebfbf1;
+      color: #065f46;
+      border: 1px solid #bbf7d0;
+      line-height: 1;
+      padding-bottom: 2px;
+    }
+
+    .card-text { flex: 1; text-align: left; }
+    .card-title { font-size: 1.05em; font-weight: 700; color: #1f2937; margin-bottom: 3px; }
+    .card-desc  { font-size: 0.85em; color: #6b7280; font-weight: 400; }
+
+    .card-arrow {
+      font-size: 20px; color: #9ca3af;
+      transition: transform 0.3s ease, color 0.3s ease;
+    }
+    .btn-menu:hover .card-arrow { transform: translateX(4px); color: #0b3d1b; }
+
+    /* Custom Scrollbar สำหรับตาราง */
+    .custom-scrollbar::-webkit-scrollbar { height: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Animations */
+    @keyframes fadeIn    { from { opacity: 0; }                     to { opacity: 1; } }
+    @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeInUp  { from { opacity: 0; transform: translateY(20px);  } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo-icon" id="logoIcon">🕓</div>
+    <h1>ระบบเช็กอินหน้างาน</h1>
+    <p class="subtitle">Face Recognition &amp; GPS Check-in</p>
+  </div>
+
+  <div id="apiWarning" class="api-warning">
+    ⚠️ ยังไม่ได้ตั้งค่า API —
+    <a href="config.html">ไปตั้งค่าก่อน</a>
+  </div>
+
+  <!-- ส่วนเมนูหลัก -->
+  <div class="menu-cards">
+    <a href="scan.html" class="btn-menu btn-scan-site">
+      <div class="card-icon">📍</div>
+      <div class="card-text">
+        <div class="card-title">เช็กอินหน้างาน</div>
+        <div class="card-desc">บันทึกตำแหน่งพิกัด ณ โครงการ</div>
+      </div>
+      <span class="card-arrow">›</span>
+    </a>
+
+    <!-- เมนูสำหรับผู้ดูแลระบบเท่านั้น (ซ่อนไว้ — แตะโลโก้ด้านบน 7 ครั้งเพื่อเปิด) -->
+    <a href="register.html" class="btn-menu btn-register admin-only" id="registerCard" style="display:none">
+      <div class="card-icon">👤</div>
+      <div class="card-text">
+        <div class="card-title">ลงทะเบียนพนักงาน</div>
+        <div class="card-desc">บันทึกข้อมูลใบหน้าใหม่ (ผู้ดูแล)</div>
+      </div>
+      <span class="card-arrow">›</span>
+    </a>
+
+    <a href="config.html" class="btn-menu btn-config admin-only" id="configCard" style="display:none">
+      <div class="card-icon">⚙️</div>
+      <div class="card-text">
+        <div class="card-title">ตั้งค่าระบบ</div>
+        <div class="card-desc">จัดการ GPS และ API (ผู้ดูแล)</div>
+      </div>
+      <span class="card-arrow">›</span>
+    </a>
+  </div>
+
+  <!-- ================= ส่วนตารางรายงาน Dashboard (อยู่ใต้เมนู) ================= -->
+  <div class="w-full max-w-4xl mt-12 space-y-8 animate-[fadeInUp_0.6s_ease_both]">
+
+    <!-- ตารางเช็กอินหน้างาน -->
+    <div class="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(20,184,166,0.1)] border border-slate-200 overflow-hidden relative">
+      <div class="absolute top-0 left-0 w-1 h-full bg-teal-500"></div>
+      <div class="bg-white px-5 py-4 border-b border-slate-200">
+        <h3 class="text-slate-800 font-semibold text-[15px] flex items-center gap-2 flex-wrap">
+          <span class="text-teal-500 text-lg">📍</span>
+          เช็กอินหน้างานประจำวันที่
+          <span id="todayDateLabelSite" class="ml-1 text-teal-600 font-bold bg-teal-50 px-2 py-0.5 rounded-md border border-teal-100">--/--/----</span>
+        </h3>
+      </div>
+      <div class="overflow-x-auto custom-scrollbar p-0">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-teal-50/80">
+              <th class="border-y border-r border-teal-100 px-1 sm:px-4 py-2 sm:py-3.5 text-[11px] sm:text-[14px] font-semibold text-teal-800 text-center whitespace-nowrap first:border-l-0">เวลา</th>
+              <th class="border border-teal-100 px-2 sm:px-4 py-2 sm:py-3.5 text-[12px] sm:text-[14px] font-semibold text-teal-800 text-center w-full sm:w-2/5">ชื่อพนักงาน</th>
+              <th class="border border-teal-100 px-1 sm:px-4 py-2 sm:py-3.5 text-[11px] sm:text-[14px] font-semibold text-teal-800 text-center whitespace-nowrap">แผนที่</th>
+              <th class="border-y border-l border-teal-100 px-1 sm:px-4 py-2 sm:py-3.5 text-[11px] sm:text-[14px] font-semibold text-teal-800 text-center whitespace-nowrap last:border-r-0">หมายเหตุ</th>
+            </tr>
+          </thead>
+          <tbody id="siteCheckinBody" class="bg-white">
+            <tr>
+              <td colspan="4" class="p-8 text-center">
+                <div class="flex flex-col items-center justify-center text-slate-400 space-y-2">
+                  <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-500"></div>
+                  <span class="text-[14px]">กำลังโหลดข้อมูล...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal สำหรับหมายเหตุ -->
+  <div id="remarkModal" class="hidden fixed inset-0 z-[9999] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden transform scale-100 transition-transform">
+      <div class="bg-gradient-to-r from-[#ebfbf1] to-white px-5 py-3.5 flex justify-between items-center border-b border-slate-200">
+        <h3 class="text-slate-800 font-semibold text-[15px] flex items-center gap-2">
+          <span class="text-[#065f46] text-lg">💬</span> ข้อความหมายเหตุ
+        </h3>
+        <button onclick="closeRemark()" class="text-slate-400 hover:text-red-500 transition-colors font-bold p-1 text-xl leading-none outline-none">
+          &times;
+        </button>
+      </div>
+      <div class="p-6 bg-white min-h-[120px] flex items-center justify-center">
+        <p id="remarkModalTextDisplay" class="text-slate-700 text-[15px] text-center w-full break-words leading-relaxed"></p>
+      </div>
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-center">
+        <button onclick="closeRemark()" class="px-6 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-medium rounded-lg text-[14px] shadow-sm transition-all focus:ring-2 focus:ring-slate-200 outline-none">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts สำหรับการทำงานของ Dashboard -->
+  <script>
+    const GAS_URL = localStorage.getItem('gasApiUrl') || GAS_API_URL;
+    const APP_KEY = localStorage.getItem('appKey') || '';
+
+    // ตั้งค่าหัวข้อวันที่
+    const now = new Date();
+    const dateString = now.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    document.getElementById('todayDateLabelSite').innerText = dateString;
+
+    // ===== โหมดผู้ดูแล: แตะโลโก้ 7 ครั้งติดกัน แล้วใส่รหัส ADMIN KEY เพื่อเปิดเมนูที่ซ่อนไว้ =====
+    function showAdminCards() {
+      document.querySelectorAll('.admin-only').forEach(c => c.style.display = '');
+    }
+    if (localStorage.getItem('adminKey') !== null) showAdminCards();
+
+    let tapCount = 0, tapTimer = null;
+    document.getElementById('logoIcon').addEventListener('click', async () => {
+      tapCount++;
+      clearTimeout(tapTimer);
+      tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
+      if (tapCount < 7) return;
+      tapCount = 0;
+
+      const input = prompt('ใส่รหัสผู้ดูแลระบบ (ADMIN KEY)');
+      if (input === null) return;
+      const key = input.trim();
+
+      if (!GAS_URL) {
+        // ยังไม่ได้ตั้งค่า API เลย (ติดตั้งครั้งแรก) — เปิดเมนูให้ไปตั้งค่าก่อน
+        localStorage.setItem('adminKey', key);
+        showAdminCards();
+        return;
+      }
+      try {
+        const res = await fetch(GAS_URL + '?action=checkAdmin&adminKey=' + encodeURIComponent(key) + '&key=' + encodeURIComponent(APP_KEY)).then(r => r.json());
+        if (res.ok) {
+          localStorage.setItem('adminKey', key);
+          showAdminCards();
+        } else {
+          alert('❌ รหัสผู้ดูแลไม่ถูกต้อง');
+        }
+      } catch (e) {
+        alert('เชื่อมต่อ API ไม่ได้ ลองใหม่อีกครั้ง');
+      }
+    });
+
+    // ฟังก์ชันเปิด-ปิด Pop-up หมายเหตุ
+    window.openRemark = function(encodedText) {
+      document.getElementById('remarkModalTextDisplay').innerText = decodeURIComponent(encodedText);
+      document.getElementById('remarkModal').classList.remove('hidden');
+    };
+
+    window.closeRemark = function() {
+      document.getElementById('remarkModal').classList.add('hidden');
+    };
+
+    // แปลงเวลาให้ถูกต้อง
+    function formatTime(timeStr) {
+      if (!timeStr || timeStr === '-') return '-';
+      if (timeStr.includes('T') && timeStr.includes('Z')) {
+        try {
+          const date = new Date(timeStr);
+          return `${date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })} น.`;
+        } catch(e) { return timeStr; }
+      }
+      if (typeof timeStr === 'string' && timeStr.includes(':')) {
+        const parts = timeStr.split(':');
+        if (parts.length >= 2) return `${parts[0]}:${parts[1]} น.`;
+      }
+      return timeStr;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function safeExternalUrl(value) {
+      try {
+        const url = new URL(String(value || ''));
+        return ['http:', 'https:'].includes(url.protocol) ? url.toString() : '';
+      } catch {
+        return '';
+      }
+    }
+
+    async function loadTodayData() {
+      try {
+        const keyQS = '&key=' + encodeURIComponent(APP_KEY);
+        const resSite = await fetch(GAS_URL + "?action=getTodaySiteCheckin" + keyQS);
+        const dataSite = await resSite.json();
+        renderTable('siteCheckinBody', dataSite);
+      } catch (e) {
+        console.error("Load Error:", e);
+        document.getElementById('siteCheckinBody').innerHTML = `<tr><td colspan="4" class="p-6 text-center text-red-500 text-[14px]">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
+      }
+    }
+
+    function renderTable(elementId, data) {
+      const body = document.getElementById(elementId);
+      const colSpan = 4;
+
+      if (data && data.error === 'unauthorized') {
+        body.innerHTML = `<tr><td colspan="${colSpan}" class="p-8 text-center text-amber-600 text-[14px]">🔒 ${escapeHtml(data.message || 'App Key ไม่ถูกต้อง')} — <a href="config.html" class="underline font-semibold">ไปตั้งค่า</a></td></tr>`;
+        return;
+      }
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        body.innerHTML = `<tr><td colspan="${colSpan}" class="p-8 text-center text-slate-400 text-[14px]">ไม่มีข้อมูลวันนี้</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = data.map(row => {
+        const timeIn = escapeHtml(formatTime(row['เวลา']));
+
+        const mapUrl = safeExternalUrl(row['Google Map Link']);
+        const linkColor = 'text-teal-600';
+
+        const mapLink = mapUrl
+          ? `<a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer" class="${linkColor} text-[11px] sm:text-[14px] underline decoration-1 underline-offset-4">ดูพิกัด</a>`
+          : `<span class="text-slate-300">-</span>`;
+
+        const rawRemark = row['หมายเหตุ'] || '';
+        const safeRemark = encodeURIComponent(rawRemark).replace(/'/g, "%27");
+        const remarkBtn = rawRemark.trim() !== ''
+          ? `<button onclick="openRemark('${safeRemark}')" class="${linkColor} text-[11px] sm:text-[14px] underline decoration-1 underline-offset-4">ดูหมายเหตุ</button>`
+          : `<span class="text-slate-300">-</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="border-y border-r border-slate-200 px-1 py-2 text-[11px] sm:text-[14px] text-center">${timeIn}</td>
+            <td class="border border-slate-200 px-2 py-2 text-[12px] sm:text-[14px] font-medium">${escapeHtml(row['ชื่อ'] || '-')}</td>
+            <td class="border border-slate-200 px-1 py-2 text-center">${mapLink}</td>
+            <td class="border-y border-l border-slate-200 px-1 py-2 text-center">${remarkBtn}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    if (!GAS_URL) {
+      document.getElementById('apiWarning').style.display = 'block';
+      document.getElementById('siteCheckinBody').innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400 text-[14px]">ยังไม่ได้ตั้งค่า API</td></tr>`;
+    } else {
+      loadTodayData();
+      setInterval(() => {
+        if (!document.hidden) loadTodayData();
+      }, 60000);
+    }
+  </script>
+</body>
+</html>

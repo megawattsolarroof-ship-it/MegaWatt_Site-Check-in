@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ลงทะเบียนใบหน้า</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="js/api-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Prompt', sans-serif;
+      min-height: 100vh;
+      background: #f9fafb;
+      color: #1f2937;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 16px 60px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+      animation: fadeIn 0.5s ease;
+    }
+
+    /* Header */
+    .page-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: #4b5563; text-decoration: none; font-size: 0.9em; font-weight: 600;
+      padding: 8px 16px; border-radius: 50px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.02);
+      transition: all 0.25s ease;
+      margin-bottom: 16px;
+    }
+    .back-btn:hover { color: #0b3d1b; background: #f3f4f6; border-color: #d1d5db; transform: translateY(-1px); }
+
+    h2 {
+      font-size: 1.5em; font-weight: 700;
+      color: #0b3d1b;
+      margin-bottom: 6px;
+    }
+    .instruction {
+      font-size: 0.85em; color: #6b7280; line-height: 1.6; font-weight: 400;
+    }
+
+    /* Step dots */
+    .step-dots {
+      display: flex; justify-content: center; gap: 10px;
+      margin: 16px 0 20px;
+    }
+    .dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #e5e7eb;
+      transition: all 0.3s ease;
+    }
+    .dot.active {
+      background: #0b3d1b;
+      box-shadow: 0 0 10px rgba(11, 61, 27, 0.4);
+    }
+
+    /* Status */
+    #status {
+      font-size: 0.9em; color: #6b7280; font-weight: 600;
+      margin-bottom: 14px; min-height: 20px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 3px solid #e5e7eb;
+      border-top-color: #0b3d1b;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Video */
+    .video-wrapper {
+      position: relative;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 4px solid #ffffff;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.08);
+      background: #000000;
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    video {
+      width: 100%; display: block;
+      transform: scaleX(-1);
+      border-radius: 16px;
+    }
+
+    /* Form Section */
+    .form-section {
+      margin-top: 24px;
+      background: #ffffff;
+      border: 1px solid #f3f4f6;
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+    }
+
+    .input-group {
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 14px 16px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      color: #1f2937;
+      font-size: 14px;
+      font-weight: 500;
+      font-family: 'Prompt', sans-serif;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    .input-group input::placeholder { color: #9ca3af; font-weight: 400; }
+    .input-group input:focus {
+      border-color: #0b3d1b;
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(11, 61, 27, 0.1);
+    }
+
+    #btnSave {
+      width: 100%;
+      padding: 16px;
+      background: #0b3d1b;
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: 'Prompt', sans-serif;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(11, 61, 27, 0.15);
+    }
+    #btnSave:hover:not(:disabled) {
+      background: #166534;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 15px rgba(22, 101, 52, 0.25);
+    }
+    #btnSave:disabled {
+      background: #e5e7eb;
+      color: #9ca3af;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .count-badge {
+      background: rgba(255,255,255,0.25);
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+    }
+    #btnSave:disabled .count-badge { background: #d1d5db; color: #ffffff; }
+
+    #msg {
+      margin-top: 16px; min-height: 24px;
+      font-size: 0.9em; font-weight: 600;
+      text-align: center;
+    }
+    .msg-success { color: #059669; }
+    .msg-error   { color: #dc2626; }
+
+    /* Animations */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin   { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="page-header">
+    <a href="index.html" class="back-btn">← กลับหน้าหลัก</a>
+    <h2>👤 ลงทะเบียนใบหน้า</h2>
+    <p class="instruction">บันทึก 3 มุม: หน้าตรง / หันซ้ายเล็กน้อย / หันขวาเล็กน้อย<br>เพื่อความแม่นยำสูงสุด</p>
+  </div>
+
+  <div class="step-dots">
+    <div class="dot" id="dot1"></div>
+    <div class="dot" id="dot2"></div>
+    <div class="dot" id="dot3"></div>
+  </div>
+
+  <div id="status">
+    <span class="spinner"></span> กำลังโหลด AI Model...
+  </div>
+
+  <div class="video-wrapper">
+    <video id="video" autoplay muted playsinline></video>
+  </div>
+
+  <div class="form-section">
+    <div class="input-group">
+      <input type="text" id="username" placeholder="ชื่อ-นามสกุลพนักงาน">
+    </div>
+
+    <button id="btnSave" onclick="saveFace()" disabled>
+      📸 บันทึกใบหน้า <span id="saveCount" class="count-badge">0</span>
+    </button>
+
+    <div id="msg"></div>
+  </div>
+</div>
+
+<script>
+  const API_URL   = localStorage.getItem('gasApiUrl') || GAS_API_URL;
+  const APP_KEY   = localStorage.getItem('appKey') || '';
+  const video     = document.getElementById('video');
+  const statusDiv = document.getElementById('status');
+  const btnSave   = document.getElementById('btnSave');
+  const msgDiv    = document.getElementById('msg');
+  const countSpan = document.getElementById('saveCount');
+  let saveCounter = 0;
+  let knownFaces  = [];   // ใบหน้าที่ลงทะเบียนแล้ว — ใช้เช็กว่าหน้าใหม่คล้ายคนอื่นเกินไปหรือไม่
+
+  // ระยะห่างขั้นต่ำจากใบหน้า "คนอื่น" — ถ้าใกล้กว่านี้ เสี่ยงสแกนแล้วชื่อสลับกัน
+  const DUPLICATE_DISTANCE = 0.42;
+
+  // ===== ด่านตรวจผู้ดูแล: หน้านี้เปิดได้เฉพาะคนที่มีรหัส ADMIN KEY =====
+  async function requireAdmin() {
+    let adminKey = localStorage.getItem('adminKey');
+    if (adminKey === null) {
+      const input = prompt('หน้านี้สำหรับผู้ดูแลระบบ — กรอกรหัสผู้ดูแล (ADMIN KEY)');
+      if (input === null) { window.location.replace('index.html'); return false; }
+      adminKey = input.trim();
+    }
+    try {
+      const res = await fetch(API_URL + '?action=checkAdmin&adminKey=' + encodeURIComponent(adminKey) + '&key=' + encodeURIComponent(APP_KEY)).then(r => r.json());
+      if (!res.ok) {
+        alert('❌ รหัสผู้ดูแลไม่ถูกต้อง');
+        localStorage.removeItem('adminKey');
+        window.location.replace('index.html');
+        return false;
+      }
+      localStorage.setItem('adminKey', adminKey);
+      return true;
+    } catch (e) {
+      return true; // API ล่ม — backend ยังกันชั้นสุดท้ายตอนบันทึกอยู่ดี
+    }
+  }
+
+  if (!API_URL) {
+    statusDiv.innerHTML = '<span style="color:#dc2626">❌ ยังไม่ได้ตั้งค่า API URL — <a href="config.html" style="color:#d97706">ไปตั้งค่า</a></span>';
+  } else {
+    window.addEventListener('load', async () => {
+      if (!(await requireAdmin())) return;
+      initModels();
+    });
+  }
+
+  function updateDots() {
+    [1,2,3].forEach(i => {
+      const dot = document.getElementById('dot' + i);
+      dot.className = 'dot' + (i <= saveCounter ? ' active' : '');
+    });
+  }
+
+  async function initModels() {
+    try {
+      const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+      await Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+      ]);
+      loadKnownFaces();
+      startCamera();
+    } catch (e) {
+      statusDiv.textContent = '❌ โหลด AI Model ล้มเหลว: ' + e.message;
+      statusDiv.style.color = '#dc2626';
+    }
+  }
+
+  async function loadKnownFaces() {
+    try {
+      const data = await fetch(API_URL + '?action=getKnownFaces&key=' + encodeURIComponent(APP_KEY)).then(r => r.json());
+      if (Array.isArray(data)) {
+        knownFaces = data.map(u => ({ name: u.label, descriptor: new Float32Array(u.descriptor) }));
+      }
+    } catch (e) { /* โหลดไม่ได้ก็ยังลงทะเบียนได้ แค่ไม่มีตัวเช็กหน้าซ้ำ */ }
+  }
+
+  function startCamera() {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      .then(stream => {
+        video.srcObject = stream;
+        statusDiv.innerText = '';
+        btnSave.disabled = false;
+      })
+      .catch(err => {
+        statusDiv.textContent = '❌ เปิดกล้องไม่ได้: ' + err.message;
+        statusDiv.style.color = '#dc2626';
+      });
+  }
+
+  async function saveFace() {
+    const name = document.getElementById('username').value.trim();
+    if (!name) return alert('กรุณาใส่ชื่อก่อน');
+
+    // ปิดปุ่มระหว่างรอประมวลผล
+    btnSave.disabled = true;
+    btnSave.innerHTML = '⏳ กำลังประมวลผล...';
+    msgDiv.innerText = '';
+
+    const detection = await faceapi
+      .detectSingleFace(video)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (!detection) {
+      alert('ไม่พบใบหน้า! กรุณามองกล้องให้ชัดเจน');
+      btnSave.disabled = false;
+      btnSave.innerHTML = '📸 บันทึกใบหน้า <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
+      return;
+    }
+
+    // เฟรมไม่ชัดพอ (มัว/มืด/หน้าเล็กเกินไป) — ถ้าเก็บไปจะทำให้สแกนจับผิดคนภายหลัง
+    if (detection.detection.score < 0.7) {
+      alert('ภาพไม่ชัดพอ กรุณาเข้าใกล้กล้องขึ้น อยู่ในที่แสงสว่าง แล้วลองใหม่');
+      btnSave.disabled = false;
+      btnSave.innerHTML = '📸 บันทึกใบหน้า <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
+      return;
+    }
+
+    // เช็กว่าใบหน้านี้ใกล้เคียงกับ "คนอื่น" ที่ลงทะเบียนไว้แล้วหรือไม่ — ต้นเหตุหลักของการสแกนขึ้นชื่อผิดคน
+    let closest = { name: '', distance: 1 };
+    knownFaces.forEach(u => {
+      if (u.name === name) return;
+      const d = faceapi.euclideanDistance(detection.descriptor, u.descriptor);
+      if (d < closest.distance) closest = { name: u.name, distance: d };
+    });
+    if (closest.name && closest.distance < DUPLICATE_DISTANCE) {
+      const go = confirm(
+        '⚠️ ใบหน้านี้คล้ายกับ "' + closest.name + '" ที่ลงทะเบียนไว้แล้วมาก (ระยะ ' + closest.distance.toFixed(2) + ')\n' +
+        'ถ้าบันทึกต่อ เวลาสแกนอาจขึ้นชื่อสลับกันได้\n\n' +
+        'ถ้าเป็นคนเดียวกันที่เคยลงทะเบียนชื่ออื่น ให้ไปลบแถวเก่าในชีต Faces ก่อน\n\n' +
+        'ยืนยันบันทึกต่อหรือไม่?'
+      );
+      if (!go) {
+        btnSave.disabled = false;
+        btnSave.innerHTML = '📸 บันทึกใบหน้า <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
+        return;
+      }
+    }
+
+    const descriptorArray = Array.from(detection.descriptor);
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'registerUser',
+          key: APP_KEY,
+          adminKey: localStorage.getItem('adminKey') || '',
+          name: name,
+          descriptor: descriptorArray
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.status === 'success' || data.success) {
+        saveCounter++;
+        countSpan.innerText = saveCounter;
+        updateDots();
+
+        if (saveCounter >= 3) {
+           msgDiv.innerHTML = '<span class="msg-success">🎉 ลงทะเบียนครบ 3 มุมสำเร็จ!</span>';
+           btnSave.innerHTML = '✅ ลงทะเบียนเรียบร้อย';
+           document.getElementById('username').disabled = true;
+        } else {
+           msgDiv.innerHTML = '<span class="msg-success">✅ บันทึกครั้งที่ ' + saveCounter + ' สำเร็จ! ขยับหน้าเล็กน้อยแล้วกดอีกครั้ง</span>';
+           btnSave.disabled = false;
+           btnSave.innerHTML = '📸 บันทึกเพิ่ม <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
+        }
+      } else {
+        throw new Error(data.message || 'เกิดข้อผิดพลาดจากระบบหลังบ้าน');
+      }
+
+    } catch (e) {
+      msgDiv.textContent = '❌ บันทึกล้มเหลว: ' + e.message;
+      msgDiv.className = 'msg-error';
+      btnSave.disabled = false;
+      btnSave.innerHTML = '📸 บันทึกใบหน้า <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
+    }
+  }
+</script>
+</body>
+</html>
