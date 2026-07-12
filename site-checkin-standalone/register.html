@@ -7,6 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#04262b">
   <script src="js/api-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.js"></script>
   <style>
@@ -190,7 +194,7 @@
   <div class="page-header">
     <a href="index.html" class="back-btn">← กลับหน้าหลัก</a>
     <h2>👤 ลงทะเบียนใบหน้า</h2>
-    <p class="instruction">บันทึก 3 มุม: หน้าตรง / หันซ้ายเล็กน้อย / หันขวาเล็กน้อย<br>เพื่อความแม่นยำสูงสุด</p>
+    <p class="instruction">กดเริ่มเพียงครั้งเดียว แล้วค่อย ๆ หันหน้าไปด้านหนึ่งและหมุนกลับไปอีกด้าน<br>ระบบจะเก็บใบหน้าให้อัตโนมัติ</p>
   </div>
 
   <div class="step-dots">
@@ -212,8 +216,8 @@
       <input type="text" id="username" placeholder="ชื่อ-นามสกุลพนักงาน">
     </div>
 
-    <button id="btnSave" onclick="saveFace()" disabled>
-      📸 บันทึกใบหน้า <span id="saveCount" class="count-badge">0</span>
+    <button id="btnSave" onclick="startAutoCapture()" disabled>
+      🎥 เริ่มสแกนใบหน้า
     </button>
 
     <div id="msg"></div>
@@ -227,43 +231,17 @@
   const statusDiv = document.getElementById('status');
   const btnSave   = document.getElementById('btnSave');
   const msgDiv    = document.getElementById('msg');
-  const countSpan = document.getElementById('saveCount');
   let saveCounter = 0;
+  let isCapturing = false;
   let knownFaces  = [];   // ใบหน้าที่ลงทะเบียนแล้ว — ใช้เช็กว่าหน้าใหม่คล้ายคนอื่นเกินไปหรือไม่
 
   // ระยะห่างขั้นต่ำจากใบหน้า "คนอื่น" — ถ้าใกล้กว่านี้ เสี่ยงสแกนแล้วชื่อสลับกัน
   const DUPLICATE_DISTANCE = 0.42;
 
-  // ===== ด่านตรวจผู้ดูแล: หน้านี้เปิดได้เฉพาะคนที่มีรหัส ADMIN KEY =====
-  async function requireAdmin() {
-    let adminKey = localStorage.getItem('adminKey');
-    if (adminKey === null) {
-      const input = prompt('หน้านี้สำหรับผู้ดูแลระบบ — กรอกรหัสผู้ดูแล (ADMIN KEY)');
-      if (input === null) { window.location.replace('index.html'); return false; }
-      adminKey = input.trim();
-    }
-    try {
-      const res = await fetch(API_URL + '?action=checkAdmin&adminKey=' + encodeURIComponent(adminKey) + '&key=' + encodeURIComponent(APP_KEY)).then(r => r.json());
-      if (!res.ok) {
-        alert('❌ รหัสผู้ดูแลไม่ถูกต้อง');
-        localStorage.removeItem('adminKey');
-        window.location.replace('index.html');
-        return false;
-      }
-      localStorage.setItem('adminKey', adminKey);
-      return true;
-    } catch (e) {
-      return true; // API ล่ม — backend ยังกันชั้นสุดท้ายตอนบันทึกอยู่ดี
-    }
-  }
-
   if (!API_URL) {
     statusDiv.innerHTML = '<span style="color:#dc2626">❌ ยังไม่ได้ตั้งค่า API URL — <a href="config.html" style="color:#d97706">ไปตั้งค่า</a></span>';
   } else {
-    window.addEventListener('load', async () => {
-      if (!(await requireAdmin())) return;
-      initModels();
-    });
+    window.addEventListener('load', initModels);
   }
 
   function updateDots() {
@@ -311,95 +289,103 @@
       });
   }
 
-  async function saveFace() {
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  function faceTurn(detection) {
+    const jaw = detection.landmarks.getJawOutline();
+    const nose = detection.landmarks.getNose();
+    const faceWidth = Math.max(1, jaw[16].x - jaw[0].x);
+    const faceCenter = (jaw[0].x + jaw[16].x) / 2;
+    return (nose[3].x - faceCenter) / faceWidth;
+  }
+
+  async function detectGoodFace() {
+    const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+    return detection && detection.detection.score >= 0.7 ? detection : null;
+  }
+
+  async function capturePose(test, instruction, timeoutMs = 25000) {
+    statusDiv.textContent = instruction;
+    const started = Date.now();
+    let stableFrames = 0;
+    let latest = null;
+    while (isCapturing && Date.now() - started < timeoutMs) {
+      const detection = await detectGoodFace();
+      if (detection && test(faceTurn(detection))) {
+        latest = detection;
+        stableFrames++;
+        if (stableFrames >= 2) return latest;
+      } else {
+        stableFrames = 0;
+      }
+      await wait(250);
+    }
+    throw new Error('ใช้เวลานานเกินไป กรุณาอยู่ในที่สว่างและหันหน้าช้า ๆ แล้วลองใหม่');
+  }
+
+  async function startAutoCapture() {
     const name = document.getElementById('username').value.trim();
     if (!name) return alert('กรุณาใส่ชื่อก่อน');
-
-    // ปิดปุ่มระหว่างรอประมวลผล
+    if (isCapturing) return;
+    isCapturing = true;
     btnSave.disabled = true;
-    btnSave.innerHTML = '⏳ กำลังประมวลผล...';
+    btnSave.innerHTML = '⏳ กำลังสแกน...';
     msgDiv.innerText = '';
-
-    const detection = await faceapi
-      .detectSingleFace(video)
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (!detection) {
-      alert('ไม่พบใบหน้า! กรุณามองกล้องให้ชัดเจน');
-      btnSave.disabled = false;
-      btnSave.innerHTML = '📸 บันทึกใบหน้า <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
-      return;
-    }
-
-    // เฟรมไม่ชัดพอ (มัว/มืด/หน้าเล็กเกินไป) — ถ้าเก็บไปจะทำให้สแกนจับผิดคนภายหลัง
-    if (detection.detection.score < 0.7) {
-      alert('ภาพไม่ชัดพอ กรุณาเข้าใกล้กล้องขึ้น อยู่ในที่แสงสว่าง แล้วลองใหม่');
-      btnSave.disabled = false;
-      btnSave.innerHTML = '📸 บันทึกใบหน้า <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
-      return;
-    }
-
-    // เช็กว่าใบหน้านี้ใกล้เคียงกับ "คนอื่น" ที่ลงทะเบียนไว้แล้วหรือไม่ — ต้นเหตุหลักของการสแกนขึ้นชื่อผิดคน
-    let closest = { name: '', distance: 1 };
-    knownFaces.forEach(u => {
-      if (u.name === name) return;
-      const d = faceapi.euclideanDistance(detection.descriptor, u.descriptor);
-      if (d < closest.distance) closest = { name: u.name, distance: d };
-    });
-    if (closest.name && closest.distance < DUPLICATE_DISTANCE) {
-      const go = confirm(
-        '⚠️ ใบหน้านี้คล้ายกับ "' + closest.name + '" ที่ลงทะเบียนไว้แล้วมาก (ระยะ ' + closest.distance.toFixed(2) + ')\n' +
-        'ถ้าบันทึกต่อ เวลาสแกนอาจขึ้นชื่อสลับกันได้\n\n' +
-        'ถ้าเป็นคนเดียวกันที่เคยลงทะเบียนชื่ออื่น ให้ไปลบแถวเก่าในชีต Faces ก่อน\n\n' +
-        'ยืนยันบันทึกต่อหรือไม่?'
-      );
-      if (!go) {
-        btnSave.disabled = false;
-        btnSave.innerHTML = '📸 บันทึกใบหน้า <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
-        return;
-      }
-    }
-
-    const descriptorArray = Array.from(detection.descriptor);
-
     try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'registerUser',
-          key: APP_KEY,
-          adminKey: localStorage.getItem('adminKey') || '',
-          name: name,
-          descriptor: descriptorArray
-        })
+      const captures = [];
+      const center = await capturePose(yaw => Math.abs(yaw) < 0.055, '① มองตรงที่กล้อง');
+      captures.push(center);
+      saveCounter = 1;
+      updateDots();
+
+      let closest = { name: '', distance: 1 };
+      knownFaces.forEach(u => {
+        if (u.name === name) return;
+        const distance = faceapi.euclideanDistance(center.descriptor, u.descriptor);
+        if (distance < closest.distance) closest = { name: u.name, distance };
       });
+      if (closest.name && closest.distance < DUPLICATE_DISTANCE && !confirm(
+        '⚠️ ใบหน้านี้คล้ายกับ "' + closest.name + '" ที่ลงทะเบียนไว้แล้วมาก\nยืนยันลงทะเบียนต่อหรือไม่?'
+      )) throw new Error('ยกเลิกการลงทะเบียน');
 
-      const data = await res.json();
+      const firstSide = await capturePose(yaw => Math.abs(yaw) > 0.09, '② ค่อย ๆ หันหน้าไปด้านใดด้านหนึ่ง');
+      const firstDirection = Math.sign(faceTurn(firstSide));
+      captures.push(firstSide);
+      saveCounter = 2;
+      updateDots();
 
-      if (data.status === 'success' || data.success) {
-        saveCounter++;
-        countSpan.innerText = saveCounter;
-        updateDots();
+      const otherSide = await capturePose(
+        yaw => Math.abs(yaw) > 0.09 && Math.sign(yaw) === -firstDirection,
+        '③ หมุนหน้ากลับช้า ๆ ผ่านตรงกลาง ไปอีกด้านหนึ่ง'
+      );
+      captures.push(otherSide);
+      saveCounter = 3;
+      updateDots();
+      statusDiv.textContent = 'กำลังบันทึกข้อมูล...';
 
-        if (saveCounter >= 3) {
-           msgDiv.innerHTML = '<span class="msg-success">🎉 ลงทะเบียนครบ 3 มุมสำเร็จ!</span>';
-           btnSave.innerHTML = '✅ ลงทะเบียนเรียบร้อย';
-           document.getElementById('username').disabled = true;
-        } else {
-           msgDiv.innerHTML = '<span class="msg-success">✅ บันทึกครั้งที่ ' + saveCounter + ' สำเร็จ! ขยับหน้าเล็กน้อยแล้วกดอีกครั้ง</span>';
-           btnSave.disabled = false;
-           btnSave.innerHTML = '📸 บันทึกเพิ่ม <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
-        }
-      } else {
-        throw new Error(data.message || 'เกิดข้อผิดพลาดจากระบบหลังบ้าน');
+      for (const capture of captures) {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'registerUser', key: APP_KEY, name, descriptor: Array.from(capture.descriptor) })
+        });
+        const data = await res.json();
+        if (!(data.status === 'success' || data.success)) throw new Error(data.message || 'เกิดข้อผิดพลาดจากระบบหลังบ้าน');
       }
 
+      statusDiv.textContent = '';
+      msgDiv.innerHTML = '<span class="msg-success">🎉 ลงทะเบียนใบหน้าสำเร็จ!</span>';
+      btnSave.innerHTML = '✅ ลงทะเบียนเรียบร้อย';
+      document.getElementById('username').disabled = true;
+      isCapturing = false;
     } catch (e) {
+      isCapturing = false;
+      saveCounter = 0;
+      updateDots();
+      statusDiv.textContent = '';
       msgDiv.textContent = '❌ บันทึกล้มเหลว: ' + e.message;
       msgDiv.className = 'msg-error';
       btnSave.disabled = false;
-      btnSave.innerHTML = '📸 บันทึกใบหน้า <span class="count-badge" id="saveCount">' + saveCounter + '</span>';
+      btnSave.innerHTML = '🎥 เริ่มสแกนใบหน้าใหม่';
     }
   }
 </script>

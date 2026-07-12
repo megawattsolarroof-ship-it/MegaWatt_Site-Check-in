@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/scan.html", "destination": "https://megawatt-assets.vercel.app/scan.html" },
+    { "source": "/scan", "destination": "https://megawatt-assets.vercel.app/scan.html" },
+    { "source": "/register.html", "destination": "https://megawatt-assets2.vercel.app/register.html" },
+    { "source": "/register", "destination": "https://megawatt-assets2.vercel.app/register.html" }
+  ]
+}

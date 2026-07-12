@@ -7,6 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#04262b">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="js/api-config.js"></script>
   <style>
@@ -40,6 +44,11 @@
       margin-bottom: 12px;
       text-shadow: 0 4px 10px rgba(0,0,0,0.05);
       line-height: 1;
+    }
+    .logo-icon img {
+      width: 72px; height: 72px;
+      border-radius: 18px;
+      box-shadow: 0 4px 14px rgba(4, 38, 43, 0.3);
     }
     h1 {
       font-size: 1.6em;
@@ -146,9 +155,9 @@
 <body>
 
   <div class="header">
-    <div class="logo-icon" id="logoIcon">🕓</div>
+    <div class="logo-icon"><img src="icons/icon-192.jpg" alt="MEGAwatt Solar"></div>
     <h1>ระบบเช็กอินหน้างาน</h1>
-    <p class="subtitle">Face Recognition &amp; GPS Check-in</p>
+    <p class="subtitle">MEGAwatt Solar — Face Recognition &amp; GPS Check-in</p>
   </div>
 
   <div id="apiWarning" class="api-warning">
@@ -158,6 +167,15 @@
 
   <!-- ส่วนเมนูหลัก -->
   <div class="menu-cards">
+    <a href="register.html" class="btn-menu btn-register">
+      <div class="card-icon">👤</div>
+      <div class="card-text">
+        <div class="card-title">ลงทะเบียนพนักงาน</div>
+        <div class="card-desc">บันทึกข้อมูลใบหน้าใหม่</div>
+      </div>
+      <span class="card-arrow">›</span>
+    </a>
+
     <a href="scan.html" class="btn-menu btn-scan-site">
       <div class="card-icon">📍</div>
       <div class="card-text">
@@ -167,21 +185,11 @@
       <span class="card-arrow">›</span>
     </a>
 
-    <!-- เมนูสำหรับผู้ดูแลระบบเท่านั้น (ซ่อนไว้ — แตะโลโก้ด้านบน 7 ครั้งเพื่อเปิด) -->
-    <a href="register.html" class="btn-menu btn-register admin-only" id="registerCard" style="display:none">
-      <div class="card-icon">👤</div>
-      <div class="card-text">
-        <div class="card-title">ลงทะเบียนพนักงาน</div>
-        <div class="card-desc">บันทึกข้อมูลใบหน้าใหม่ (ผู้ดูแล)</div>
-      </div>
-      <span class="card-arrow">›</span>
-    </a>
-
-    <a href="config.html" class="btn-menu btn-config admin-only" id="configCard" style="display:none">
+    <a href="config.html" class="btn-menu btn-config">
       <div class="card-icon">⚙️</div>
       <div class="card-text">
         <div class="card-title">ตั้งค่าระบบ</div>
-        <div class="card-desc">จัดการ GPS และ API (ผู้ดูแล)</div>
+        <div class="card-desc">จัดการ GPS และ API (ต้องใส่รหัส)</div>
       </div>
       <span class="card-arrow">›</span>
     </a>
@@ -257,43 +265,6 @@
     const now = new Date();
     const dateString = now.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
     document.getElementById('todayDateLabelSite').innerText = dateString;
-
-    // ===== โหมดผู้ดูแล: แตะโลโก้ 7 ครั้งติดกัน แล้วใส่รหัส ADMIN KEY เพื่อเปิดเมนูที่ซ่อนไว้ =====
-    function showAdminCards() {
-      document.querySelectorAll('.admin-only').forEach(c => c.style.display = '');
-    }
-    if (localStorage.getItem('adminKey') !== null) showAdminCards();
-
-    let tapCount = 0, tapTimer = null;
-    document.getElementById('logoIcon').addEventListener('click', async () => {
-      tapCount++;
-      clearTimeout(tapTimer);
-      tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
-      if (tapCount < 7) return;
-      tapCount = 0;
-
-      const input = prompt('ใส่รหัสผู้ดูแลระบบ (ADMIN KEY)');
-      if (input === null) return;
-      const key = input.trim();
-
-      if (!GAS_URL) {
-        // ยังไม่ได้ตั้งค่า API เลย (ติดตั้งครั้งแรก) — เปิดเมนูให้ไปตั้งค่าก่อน
-        localStorage.setItem('adminKey', key);
-        showAdminCards();
-        return;
-      }
-      try {
-        const res = await fetch(GAS_URL + '?action=checkAdmin&adminKey=' + encodeURIComponent(key) + '&key=' + encodeURIComponent(APP_KEY)).then(r => r.json());
-        if (res.ok) {
-          localStorage.setItem('adminKey', key);
-          showAdminCards();
-        } else {
-          alert('❌ รหัสผู้ดูแลไม่ถูกต้อง');
-        }
-      } catch (e) {
-        alert('เชื่อมต่อ API ไม่ได้ ลองใหม่อีกครั้ง');
-      }
-    });
 
     // ฟังก์ชันเปิด-ปิด Pop-up หมายเหตุ
     window.openRemark = function(encodedText) {

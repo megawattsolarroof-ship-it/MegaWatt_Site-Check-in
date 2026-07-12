@@ -7,6 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#04262b">
   <script src="js/api-config.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -222,48 +226,30 @@
   <div id="msg"></div>
 
   <a href="index.html" class="btn-back-bottom">← กลับเมนูหลัก</a>
-  <button class="btn-back-bottom" onclick="exitAdminMode()" style="color:#dc2626; border-color:#fecaca;">🚪 ออกจากโหมดผู้ดูแล (ซ่อนเมนูอีกครั้ง)</button>
 </div>
 
 <script>
   const msgDiv = document.getElementById('msg');
 
-  // ===== ด่านตรวจผู้ดูแล: หน้านี้เปิดได้เฉพาะคนที่มีรหัส ADMIN KEY =====
-  // (ยกเว้นตอนติดตั้งครั้งแรกที่ยังไม่มี API URL — ต้องเปิดได้เพื่อตั้งค่าระบบ)
-  async function requireAdmin() {
-    const apiUrl = localStorage.getItem('gasApiUrl') || GAS_API_URL;
-    let adminKey = localStorage.getItem('adminKey');
+  // ===== รหัสเข้าหน้าตั้งค่า — ถามทุกครั้งที่เปิดหน้านี้ =====
+  const ADMIN_PASS = 'solarroof1';
 
-    if (adminKey === null) {
-      const input = prompt('หน้านี้สำหรับผู้ดูแลระบบ — กรอกรหัสผู้ดูแล (ADMIN KEY)');
-      if (input === null) { window.location.replace('index.html'); return false; }
-      adminKey = input.trim();
-    }
+  // รหัสฝั่ง backend — ต้องตรงกับ ADMIN_SECRET ใน Script Properties ของ GAS
+  const ADMIN_SECRET_KEY = 'solarroof1';
 
-    if (!apiUrl) {
-      localStorage.setItem('adminKey', adminKey);
-      return true; // ยังไม่ได้ตั้งค่าระบบครั้งแรก — ให้เข้ามาตั้งค่าได้
+  function requireAdmin() {
+    const input = prompt('กรอกรหัสเพื่อเข้าหน้าตั้งค่าระบบ');
+    if (input === null) { window.location.replace('index.html'); return false; }
+    if (input.trim() !== ADMIN_PASS) {
+      alert('❌ รหัสไม่ถูกต้อง');
+      window.location.replace('index.html');
+      return false;
     }
-
-    try {
-      const appKey = localStorage.getItem('appKey') || '';
-      const res = await fetch(apiUrl + '?action=checkAdmin&adminKey=' + encodeURIComponent(adminKey) + '&key=' + encodeURIComponent(appKey)).then(r => r.json());
-      if (!res.ok) {
-        alert('❌ รหัสผู้ดูแลไม่ถูกต้อง');
-        localStorage.removeItem('adminKey');
-        window.location.replace('index.html');
-        return false;
-      }
-      localStorage.setItem('adminKey', adminKey);
-      return true;
-    } catch (e) {
-      // เชื่อมต่อ API ไม่ได้ — ปล่อยให้เปิดหน้าได้ แต่ backend จะปฏิเสธการบันทึกเองถ้ารหัสผิด
-      return true;
-    }
+    return true;
   }
 
-  window.onload = async function() {
-    if (!(await requireAdmin())) return;
+  window.onload = function() {
+    if (!requireAdmin()) return;
 
     const savedUrl = localStorage.getItem('gasApiUrl') || GAS_API_URL;
     document.getElementById('apiUrl').value = savedUrl;
@@ -273,11 +259,6 @@
       loadGpsConfig(savedUrl);
     }
   };
-
-  function exitAdminMode() {
-    localStorage.removeItem('adminKey');
-    window.location.href = 'index.html';
-  }
 
   function appKey() {
     return document.getElementById('appKey').value.trim() || localStorage.getItem('appKey') || '';
@@ -327,15 +308,11 @@
         body: JSON.stringify({
           action: 'saveConfig',
           key: key,
-          adminKey: localStorage.getItem('adminKey') || '',
+          adminKey: ADMIN_SECRET_KEY,
           lat, lng, radius
         })
       });
       const data = await res.json();
-      if (data.error === 'admin_required') {
-        localStorage.removeItem('adminKey');
-        return showMsg('❌ ' + data.message + ' — รีเฟรชหน้าแล้วกรอกรหัสใหม่', 'error');
-      }
       if (data.error) return showMsg('❌ ' + (data.message || data.error), 'error');
       showMsg('✅ ' + (data.message || 'บันทึกสำเร็จ'), 'success');
     } catch (e) {

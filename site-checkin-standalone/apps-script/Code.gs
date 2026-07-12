@@ -10,9 +10,8 @@
  *     ถ้าตั้งไว้ ทุกคำขอต้องแนบรหัสนี้ (กรอกในหน้า "ตั้งค่าระบบ" ของเว็บ)
  *     ถ้าเว้นว่าง = เปิดให้ทุกคนที่รู้ URL ใช้งานได้
  *
- *     ADMIN_SECRET = รหัสผู้ดูแลระบบ (คนละตัวกับ APP_SECRET)
- *     ใช้ป้องกันการ "แก้ตั้งค่า GPS" และ "ลงทะเบียนใบหน้า" — เฉพาะคนที่รู้รหัสนี้เท่านั้น
- *     ฝั่งเว็บ: แตะโลโก้หน้าแรก 7 ครั้ง แล้วกรอกรหัสนี้ เพื่อเปิดเมนูผู้ดูแล
+ *     ADMIN_SECRET = solarroof1 (ต้องตรงกับ ADMIN_SECRET_KEY ใน config.html)
+ *     ใช้ป้องกันการ "แก้ตั้งค่า GPS" — คนที่ไม่รู้รหัสนี้แก้ค่าไม่ได้
  *     ถ้าเว้นว่าง = ใครก็แก้ตั้งค่าได้ (ไม่แนะนำ)
  *  4) Deploy → New deployment → Web app
  *       - Execute as: Me
@@ -42,6 +41,7 @@ function doGet(e) {
     if (action === 'getTodayAttendance')   return json_(getTodayAttendance_());
     if (action === 'getTodaySiteCheckin')  return json_(getTodaySiteCheckin_());
     if (action === 'checkAdmin')           return json_({ ok: checkAdmin_(e.parameter.adminKey) });
+    if (action === 'debugToday')           return json_(debugToday_());
     return json_({ error: 'unknown_action', message: 'ไม่รู้จัก action: ' + action });
   } catch (err) {
     return json_({ error: 'server_error', message: String(err) });
@@ -55,16 +55,13 @@ function doPost(e) {
   if (!checkKey_(e, body)) return json_({ error: 'unauthorized', message: 'App Key ไม่ถูกต้อง — กรอกในหน้าตั้งค่าระบบ' });
 
   try {
-    // registerUser และ saveConfig เป็นสิทธิ์ผู้ดูแลเท่านั้น (ต้องแนบ adminKey ให้ตรง ADMIN_SECRET)
-    if (body.action === 'registerUser') {
-      if (!checkAdmin_(body.adminKey)) return json_({ error: 'admin_required', message: 'เฉพาะผู้ดูแลระบบ — รหัสผู้ดูแล (ADMIN KEY) ไม่ถูกต้อง' });
-      return json_(registerUser_(body));
-    }
+    if (body.action === 'registerUser')  return json_(registerUser_(body));
+    if (body.action === 'logAttendance') return json_(logAttendance_(body));
+    // saveConfig ต้องแนบรหัสหน้าตั้งค่า (adminKey) ให้ตรงกับ ADMIN_SECRET
     if (body.action === 'saveConfig') {
-      if (!checkAdmin_(body.adminKey)) return json_({ error: 'admin_required', message: 'เฉพาะผู้ดูแลระบบ — รหัสผู้ดูแล (ADMIN KEY) ไม่ถูกต้อง' });
+      if (!checkAdmin_(body.adminKey)) return json_({ error: 'admin_required', message: 'รหัสเข้าหน้าตั้งค่าไม่ถูกต้อง' });
       return json_(saveConfig_(body));
     }
-    if (body.action === 'logAttendance') return json_(logAttendance_(body));
     return json_({ error: 'unknown_action', message: 'ไม่รู้จัก action: ' + (body.action || '') });
   } catch (err) {
     return json_({ error: 'server_error', message: String(err) });
@@ -111,12 +108,31 @@ function mapLink_(lat, lng) {
   return 'https://www.google.com/maps?q=' + lat + ',' + lng;
 }
 
-// อ่านค่าเซลล์ "วันที่" ให้เป็น yyyy-MM-dd เสมอ (กัน Google Sheet แปลงเป็น Date object)
+// เช็กว่าเป็นค่าแบบวันที่หรือไม่ — ห้ามใช้ instanceof Date เพราะใน runtime บางแบบให้ผลผิด
+function isDate_(v) {
+  return v && typeof v.getFullYear === 'function' && typeof v.getTime === 'function';
+}
+
+// อ่านค่าเซลล์ "วันที่" ให้เป็น yyyy-MM-dd (ค.ศ.) เสมอ
+// รองรับทั้ง Date object, ข้อความ วัน/เดือน/ปี, ปี พ.ศ. และข้อความวันที่รูปแบบอื่น ๆ
 function cellDate_(v) {
-  if (v instanceof Date) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
+  if (isDate_(v)) {
+    var y = v.getFullYear();
+    if (y > 2400) { // ปี พ.ศ. → แปลงเป็น ค.ศ.
+      v = new Date(v.getTime());
+      v.setFullYear(y - 543);
+    }
+    return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
+  }
   var s = String(v || '').trim();
-  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); // รองรับข้อความรูปแบบ วัน/เดือน/ปี
-  if (m) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); // ข้อความ วัน/เดือน/ปี (มีเวลาต่อท้ายก็ได้)
+  if (m) {
+    var yr = Number(m[3]);
+    if (yr > 2400) yr -= 543; // ปี พ.ศ. → ค.ศ.
+    return yr + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+  }
+  var t = new Date(s); // เผื่อเป็นข้อความรูปแบบอื่น เช่น "Sun Jul 12 2026 11:52:02 GMT+0700"
+  if (!isNaN(t.getTime())) return Utilities.formatDate(t, TZ, 'yyyy-MM-dd');
   return s;
 }
 
@@ -128,7 +144,7 @@ function appendRowWithDate_(sheet, values) {
 
 // อ่านค่าเซลล์ "เวลา" ให้เป็น HH:mm:ss เสมอ
 function cellTime_(v) {
-  if (v instanceof Date) return Utilities.formatDate(v, TZ, 'HH:mm:ss');
+  if (isDate_(v)) return Utilities.formatDate(v, TZ, 'HH:mm:ss');
   return String(v || '');
 }
 
@@ -195,6 +211,23 @@ function getTodaySiteCheckin_() {
     });
   }
   return rows;
+}
+
+// ตัวช่วยไล่ปัญหา "เช็กอินแล้วไม่ขึ้นในเว็บ" — เปิด <URL>/exec?action=debugToday&key=<APP_KEY>
+// จะโชว์ว่าระบบมองว่า "วันนี้" คืออะไร และอ่านวันที่ของ 5 แถวล่าสุดในชีตได้เป็นอะไร
+function debugToday_() {
+  var sheet = siteSheet_();
+  var data = sheet.getDataRange().getValues();
+  var rows = [];
+  for (var i = Math.max(1, data.length - 5); i < data.length; i++) {
+    rows.push({
+      row: i + 1,
+      rawDate: String(data[i][0]),
+      parsedDate: cellDate_(data[i][0]),
+      name: String(data[i][2] || '')
+    });
+  }
+  return { today: today_(), lastRows: rows };
 }
 
 // ---------------------------------------------------------------- actions: POST
