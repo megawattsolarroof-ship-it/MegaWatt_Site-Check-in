@@ -36,7 +36,7 @@ function doGet(e) {
 
   var action = (e && e.parameter && e.parameter.action) || '';
   try {
-    if (action === 'getConfig')            return json_(getConfig_());
+    if (action === 'getConfig')            return json_(getConfig_(e.parameter.scope));
     if (action === 'getKnownFaces')        return json_(getKnownFaces_());
     if (action === 'getTodayAttendance')   return json_(getTodayAttendance_());
     if (action === 'getTodaySiteCheckin')  return json_(getTodaySiteCheckin_());
@@ -150,15 +150,23 @@ function cellTime_(v) {
 
 // ---------------------------------------------------------------- actions: GET
 
-function getConfig_() {
+// GPS แยกกันคนละระบบ ในแท็บ Config เดียวกัน:
+//   scope ว่าง        = ระบบเช็กอินหน้างาน  → คีย์ lat / lng / radius (ของเดิม)
+//   scope=attendance  = ระบบบันทึกเวลาทำงาน → คีย์ att_lat / att_lng / att_radius
+function configPrefix_(scope) {
+  return scope === 'attendance' ? 'att_' : '';
+}
+
+function getConfig_(scope) {
+  var prefix = configPrefix_(scope);
   var sheet = configSheet_();
   var data = sheet.getDataRange().getValues();
   var config = { lat: '', lng: '', radius: 0 };
   for (var i = 1; i < data.length; i++) {
     var k = String(data[i][0]);
-    if (k === 'lat')    config.lat    = Number(data[i][1]) || '';
-    if (k === 'lng')    config.lng    = Number(data[i][1]) || '';
-    if (k === 'radius') config.radius = Number(data[i][1]) || 0;
+    if (k === prefix + 'lat')    config.lat    = Number(data[i][1]) || '';
+    if (k === prefix + 'lng')    config.lng    = Number(data[i][1]) || '';
+    if (k === prefix + 'radius') config.radius = Number(data[i][1]) || 0;
   }
   return config;
 }
@@ -279,8 +287,12 @@ function logAttendance_(body) {
 }
 
 function saveConfig_(body) {
+  var prefix = configPrefix_(body.scope);
   var sheet = configSheet_();
-  var values = { lat: body.lat, lng: body.lng, radius: body.radius };
+  var values = {};
+  values[prefix + 'lat']    = body.lat;
+  values[prefix + 'lng']    = body.lng;
+  values[prefix + 'radius'] = body.radius;
   var data = sheet.getDataRange().getValues();
 
   Object.keys(values).forEach(function (k) {
