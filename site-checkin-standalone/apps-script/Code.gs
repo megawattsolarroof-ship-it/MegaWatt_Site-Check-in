@@ -21,8 +21,8 @@
  *
  *  ชีตจะถูกสร้างให้อัตโนมัติเมื่อใช้งานครั้งแรก:
  *    - Faces        : ฐานข้อมูลใบหน้าพนักงาน
- *    - Attendance   : บันทึกเวลาเข้า-ออกงาน
- *    - Site_CheckIn : บันทึกเช็กอินหน้างาน
+ *    - Raikhing : บันทึกเวลาเข้า-ออกงาน
+ *    - Engineer : บันทึกเช็กอินหน้างาน
  *    - Config       : พิกัด GPS + รัศมีที่อนุญาต
  * ============================================================================
  */
@@ -36,12 +36,12 @@ function doGet(e) {
 
   var action = (e && e.parameter && e.parameter.action) || '';
   try {
-    if (action === 'getConfig')            return json_(getConfig_(e.parameter.scope));
-    if (action === 'getKnownFaces')        return json_(getKnownFaces_());
-    if (action === 'getTodayAttendance')   return json_(getTodayAttendance_());
-    if (action === 'getTodaySiteCheckin')  return json_(getTodaySiteCheckin_());
+    if (action === 'getConfig')            return json_(getConfig_(e.parameter.scope, e.parameter.site));
+    if (action === 'getKnownFaces')        return json_(getKnownFaces_(e.parameter.site));
+    if (action === 'getTodayAttendance')   return json_(getTodayAttendance_(e.parameter.site));
+    if (action === 'getTodaySiteCheckin')  return json_(getTodaySiteCheckin_(e.parameter.site));
     if (action === 'checkAdmin')           return json_({ ok: checkAdmin_(e.parameter.adminKey) });
-    if (action === 'debugToday')           return json_(debugToday_());
+    if (action === 'debugToday')           return json_(debugToday_(e.parameter.site));
     return json_({ error: 'unknown_action', message: 'ไม่รู้จัก action: ' + action });
   } catch (err) {
     return json_({ error: 'server_error', message: String(err) });
@@ -96,9 +96,10 @@ function ensureSheet_(name, headers) {
   return sheet;
 }
 
-function facesSheet_()      { return ensureSheet_('Faces',        ['ชื่อ', 'Descriptor', 'วันที่ลงทะเบียน']); }
-function attendanceSheet_() { return ensureSheet_('Attendance',   ['วันที่', 'ชื่อ', 'เวลาเข้า', 'เวลาออก', 'Lat', 'Lng', 'Google Map Link', 'หมายเหตุ']); }
-function siteSheet_()       { return ensureSheet_('Site_CheckIn', ['วันที่', 'เวลา', 'ชื่อ', 'Lat', 'Lng', 'Google Map Link', 'หมายเหตุ']); }
+function siteCode_(site)    { return String(site || '').toLowerCase() === 'korat' ? 'korat' : 'raikhing'; }
+function facesSheet_(site)      { return ensureSheet_(siteCode_(site) === 'korat' ? 'Faces_Korat' : 'Faces', ['ชื่อ', 'Descriptor', 'วันที่ลงทะเบียน']); }
+function attendanceSheet_(site) { return ensureSheet_(siteCode_(site) === 'korat' ? 'Korat' : 'Raikhing', ['วันที่', 'ชื่อ', 'เวลาเข้า', 'เวลาออก', 'Lat', 'Lng', 'Google Map Link', 'หมายเหตุ']); }
+function siteSheet_(site)       { return ensureSheet_(siteCode_(site) === 'korat' ? 'Engineer_Korat' : 'Engineer', ['วันที่', 'เวลา', 'ชื่อ', 'Lat', 'Lng', 'Google Map Link', 'หมายเหตุ']); }
 function configSheet_()     { return ensureSheet_('Config',       ['key', 'value']); }
 
 function today_()   { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'); }
@@ -153,12 +154,13 @@ function cellTime_(v) {
 // GPS แยกกันคนละระบบ ในแท็บ Config เดียวกัน:
 //   scope ว่าง        = ระบบเช็กอินหน้างาน  → คีย์ lat / lng / radius (ของเดิม)
 //   scope=attendance  = ระบบบันทึกเวลาทำงาน → คีย์ att_lat / att_lng / att_radius
-function configPrefix_(scope) {
-  return scope === 'attendance' ? 'att_' : '';
+function configPrefix_(scope, site) {
+  var sitePrefix = siteCode_(site) === 'korat' ? 'korat_' : '';
+  return sitePrefix + (scope === 'attendance' ? 'att_' : '');
 }
 
-function getConfig_(scope) {
-  var prefix = configPrefix_(scope);
+function getConfig_(scope, site) {
+  var prefix = configPrefix_(scope, site);
   var sheet = configSheet_();
   var data = sheet.getDataRange().getValues();
   var config = { lat: '', lng: '', radius: 0 };
@@ -171,8 +173,8 @@ function getConfig_(scope) {
   return config;
 }
 
-function getKnownFaces_() {
-  var sheet = facesSheet_();
+function getKnownFaces_(site) {
+  var sheet = facesSheet_(site);
   var data = sheet.getDataRange().getValues();
   var faces = [];
   for (var i = 1; i < data.length; i++) {
@@ -186,8 +188,8 @@ function getKnownFaces_() {
   return faces;
 }
 
-function getTodayAttendance_() {
-  var sheet = attendanceSheet_();
+function getTodayAttendance_(site) {
+  var sheet = attendanceSheet_(site);
   var data = sheet.getDataRange().getValues();
   var today = today_();
   var rows = [];
@@ -204,8 +206,8 @@ function getTodayAttendance_() {
   return rows;
 }
 
-function getTodaySiteCheckin_() {
-  var sheet = siteSheet_();
+function getTodaySiteCheckin_(site) {
+  var sheet = siteSheet_(site);
   var data = sheet.getDataRange().getValues();
   var today = today_();
   var rows = [];
@@ -223,8 +225,8 @@ function getTodaySiteCheckin_() {
 
 // ตัวช่วยไล่ปัญหา "เช็กอินแล้วไม่ขึ้นในเว็บ" — เปิด <URL>/exec?action=debugToday&key=<APP_KEY>
 // จะโชว์ว่าระบบมองว่า "วันนี้" คืออะไร และอ่านวันที่ของ 5 แถวล่าสุดในชีตได้เป็นอะไร
-function debugToday_() {
-  var sheet = siteSheet_();
+function debugToday_(site) {
+  var sheet = siteSheet_(site);
   var data = sheet.getDataRange().getValues();
   var rows = [];
   for (var i = Math.max(1, data.length - 5); i < data.length; i++) {
@@ -246,7 +248,7 @@ function registerUser_(body) {
   if (!name) return { status: 'error', message: 'ไม่พบชื่อพนักงาน' };
   if (!descriptor || !descriptor.length) return { status: 'error', message: 'ไม่พบข้อมูลใบหน้า' };
 
-  facesSheet_().appendRow([name, JSON.stringify(descriptor), Utilities.formatDate(new Date(), TZ, 'd/M/yyyy HH:mm:ss')]);
+  facesSheet_(body.site).appendRow([name, JSON.stringify(descriptor), Utilities.formatDate(new Date(), TZ, 'd/M/yyyy HH:mm:ss')]);
   return { status: 'success', message: 'บันทึกใบหน้าของ ' + name + ' สำเร็จ' };
 }
 
@@ -260,13 +262,13 @@ function logAttendance_(body) {
   var link = mapLink_(lat, lng);
 
   // เช็กอินหน้างาน → เพิ่มแถวใหม่ทุกครั้ง (เช็กอินได้หลายรอบต่อวัน)
-  if (body.sheetTarget === 'Site_CheckIn') {
-    appendRowWithDate_(siteSheet_(), [new Date(), nowTime_(), name, lat, lng, link, note]);
+  if (body.sheetTarget === 'Engineer' || body.sheetTarget === 'Site_CheckIn') {
+    appendRowWithDate_(siteSheet_(body.site), [new Date(), nowTime_(), name, lat, lng, link, note]);
     return { message: 'เช็กอินหน้างานสำเร็จ (' + name + ' เวลา ' + nowTime_().substring(0, 5) + ' น.)' };
   }
 
   // สแกนเข้า-ออกงาน → ครั้งแรกของวัน = เวลาเข้า, ครั้งถัดไป = เวลาออก
-  var sheet = attendanceSheet_();
+  var sheet = attendanceSheet_(body.site);
   var data = sheet.getDataRange().getValues();
   var today = today_();
 
@@ -287,7 +289,7 @@ function logAttendance_(body) {
 }
 
 function saveConfig_(body) {
-  var prefix = configPrefix_(body.scope);
+  var prefix = configPrefix_(body.scope, body.site);
   var sheet = configSheet_();
   var values = {};
   values[prefix + 'lat']    = body.lat;
