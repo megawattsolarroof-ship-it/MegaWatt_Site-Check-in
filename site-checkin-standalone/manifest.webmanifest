@@ -1,6 +1,6 @@
 {
-  "name": "MEGAwatt Solar — เช็กอินหน้างาน",
-  "short_name": "MEGAwatt",
+  "name": "MEGAwatt Engineer — เช็กอินหน้างาน",
+  "short_name": "MEGAwatt Engineer",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
